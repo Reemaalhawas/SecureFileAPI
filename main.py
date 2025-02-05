@@ -93,4 +93,25 @@ async def upload_file(file: UploadFile = File(...), token: str = Depends(token_a
 
     return {"filename": file.filename, "size": file_size, "message": "File uploaded successfully"}
 
+@app.get("/download/{filename}")
+async def download_file(filename: str, token: str = Depends(token_auth)):
+    payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    user_id = payload.get("user_id")
+
+    conn = get_mysql_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT file_path FROM uploaded_files WHERE file_name = %s AND uploaded_by = %s", (filename, user_id))
+    file_record = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if not file_record:
+        raise HTTPException(status_code=403, detail="You do not have access to this file")
+
+    file_path = Path(file_record[0])
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return {"message": f"File available at {file_path}"}
+
 
