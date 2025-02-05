@@ -49,3 +49,22 @@ def create_account(username: str, email: str, password: str):
     return {"message": "User successfully registered"}
 
 
+@app.post("/login/")
+def authenticate_user(form_data: OAuth2PasswordRequestForm = Depends()):
+    conn = get_mysql_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, hashed_password FROM users WHERE username = %s", (form_data.username,))
+    user_data = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    if not user_data or not password_hasher.verify(form_data.password, user_data[1]):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    access_token = generate_jwt(payload={"sub": form_data.username, "user_id": user_data[0]})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+
